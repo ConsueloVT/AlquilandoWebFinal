@@ -1,0 +1,326 @@
+﻿@page "/SolicitarReserva/{AlojamientoId:int}"
+@inject IAlojamientoRepositorio alojamientoRepositorio
+@inject IUsuarioRepositorio UsuarioRepositorio
+@inject IServicioSesion servicioSesion
+@inject ReservaAlta reservaAlta
+@inject NavigationManager NavigationManager
+@inject ServicioArchivos servicioArchivos
+
+@using AL.UI.Servicios
+@implements IDisposable
+
+@rendermode InteractiveServer
+
+
+<h3>Solicitar Reserva</h3>
+
+@if (alojamiento == null)
+{
+    <p>Cargando alojamiento...</p>
+}
+else
+{
+    <div class="row">
+        <!-- COLUMNA IZQUIERDA: formulario -->
+        <div class="col-md-7">
+            <h4>Reservar: @alojamiento.Nombre</h4>
+
+            <EditForm Model="reserva" OnValidSubmit="ProcesarReserva">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <!-- adultos -->
+                <div class="mb-3">
+                    <label>Cantidad de adultos:</label>
+                    <InputNumber @bind-Value="reserva.CantidadDeAdultos" class="form-control" disabled="@(!editarCantidades)" />
+                </div>
+
+                <!-- niños -->
+                <div class="mb-3">
+                    <label>Cantidad de niños:</label>
+                    <InputNumber @bind-Value="reserva.CantidadDeNiños" class="form-control" disabled="@(!editarCantidades)" />
+                </div>
+
+
+                <!-- info inquilinos -->
+                @if (mostrarInfoInquilinos && reserva.Inquilinos != null && reserva.Inquilinos.All(i => i != null))
+                {
+                    <div class="alert alert-warning mt-3">
+                        <p>Ingresá los datos de los inquilinos (Nombre y DNI):</p>
+                        <!-- Botón para editar cantidades -->
+                        <button type="button" class="btn btn-outline-secondary mb-3" @onclick="EditarCantidades">
+                            Editar Cantidades
+                        </button>
+
+                        @for (int i = 0; i < reserva.Inquilinos.Count; i++)
+                        {
+                            var inquilino = reserva.Inquilinos[i];
+                            if (inquilino == null)
+                            {
+                                continue; // evita intentar renderizar nulos
+                            }
+                            <div class="mb-3 border rounded p-2 bg-light">
+                                <label><strong>Inquilino @(i + 1)</strong></label>
+                                <InputText @bind-Value="inquilino.Nombre" class="form-control mb-2" placeholder="Nombre completo" />
+                               @if (alojamiento.TieneInformacionAdicional)
+                                {
+                                    <div class="mb-2">
+                                        <label>Foto frente del DNI:</label>
+                                        <InputFile OnChange="ObtenerCallbackFrente(i)" class="form-control" />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Foto dorso del DNI:</label>
+                                        <InputFile OnChange="ObtenerCallbackDorso(i)" class="form-control" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <InputText @bind-Value="inquilino.Dni" class="form-control" placeholder="DNI" />
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                <!-- Botón dinámico para continuar y reservar -->
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        @(mostrarInfoInquilinos ? "Reservar" : "Continuar")
+                    </button>
+                </div>
+            </EditForm>
+
+            @if (!string.IsNullOrWhiteSpace(mensaje))
+            {
+                <div class="alert alert-info mt-3">@mensaje</div>
+            }
+        </div>
+
+        <!-- COLUMNA DERECHA: tarjeta resumen -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-body">
+                    <h5>
+                        Resumen del Alojamiento: <span class="fw-bold">@alojamiento.Nombre</span>
+                    </h5>
+                    <p>
+                        <strong>Desde:</strong> @desde?.ToString("dd/MM/yyyy") &nbsp;&nbsp;
+                        <strong>Hasta:</strong> @hasta?.ToString("dd/MM/yyyy")
+                    </p>
+                    <p><strong>Ubicación:</strong> @alojamiento.Ciudad</p>
+                    <p><strong>Capacidad máxima:</strong> @alojamiento.CapacidadMaxima</p>
+                    <p><strong>Precio por noche:</strong> $@alojamiento.PrecioPorNoche</p>
+                    <p><strong>Noches:</strong> @((hasta - desde)?.Days)</p>
+                    <hr />
+                    @if (servicioSesion.Usuario != null && servicioSesion.Usuario.DescuentoProximaReserva > 0)
+                    {
+                        int dias = (hasta.HasValue && desde.HasValue) ? (hasta.Value - desde.Value).Days : 0;
+                        double precioOriginal = dias > 0 ? dias * alojamiento.PrecioPorNoche : 0;
+                        <p>
+                            <span style="text-decoration: line-through;">$@precioOriginal</span>
+                            <strong class="text-success ms-2">
+                            $@CalcularTotal()
+                            </strong>
+                        </p>
+                    }
+                    else
+                    {
+                        <h5 class="text-success">Total estimado: $@CalcularTotal()</h5>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int AlojamientoId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public DateTime? desde { get; set; } 
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public DateTime? hasta { get; set; }
+
+    private Alojamiento? alojamiento=new();
+    private Reserva reserva = new();
+    private string mensaje = "";
+    private List<IBrowserFile> imagenesSubidas = new();
+    private bool mostrarInfoInquilinos = false;
+
+    private bool IsLoggedIn = false;
+    private Usuario usuario=null!;
+    private bool editarCantidades = true; // inicialmente se puede editar
+    private Dictionary<int, IBrowserFile> dniFrenteArchivos = new();
+    private Dictionary<int, IBrowserFile> dniDorsoArchivos = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        alojamiento = await alojamientoRepositorio.ObtenerPorId(AlojamientoId);
+        if (alojamiento == null)
+        {
+            Console.WriteLine(AlojamientoId);
+            mensaje = "Alojamiento no encontrado.";
+            return;
+        }
+       
+        reserva.IdAlojamiento = alojamiento.Id;
+        reserva.Inquilinos = new List<Inquilino>(); // evita null
+        reserva.FechaInicioEstadia = desde ?? DateTime.Now;
+        reserva.FechaFinEstadia = hasta ?? DateTime.Now.AddDays(1);
+    }
+    private EventCallback<InputFileChangeEventArgs> ObtenerCallbackFrente(int index)
+    {
+        return EventCallback.Factory.Create<InputFileChangeEventArgs>(this, e => OnFileFrenteSeleccionado(e, index));
+    }
+
+    private EventCallback<InputFileChangeEventArgs> ObtenerCallbackDorso(int index)
+    {
+        return EventCallback.Factory.Create<InputFileChangeEventArgs>(this, e => OnFileDorsoSeleccionado(e, index));
+    }
+
+    private void OnFileFrenteSeleccionado(InputFileChangeEventArgs e, int index)
+    {
+        if (e.FileCount > 0)
+            dniFrenteArchivos[index] = e.File;
+    }
+
+    private void OnFileDorsoSeleccionado(InputFileChangeEventArgs e, int index)
+    {
+        if (e.FileCount > 0)
+            dniDorsoArchivos[index] = e.File;
+    }
+
+    private bool _isDisposed = false;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoggedIn && !_isDisposed)
+        {
+            await servicioSesion.InicializarUsuarioAsync();
+            if(servicioSesion.Usuario!=null){
+              usuario = servicioSesion.Usuario;
+              servicioSesion.IniciarSesion();
+            } 
+            IsLoggedIn = true;
+            if (!_isDisposed)
+                StateHasChanged();
+        }
+
+    }
+    public void Dispose()
+    {
+        _isDisposed = true;
+    }
+    private double CalcularTotal()
+    {
+        if (alojamiento == null || !desde.HasValue || !hasta.HasValue)
+            return 0;
+
+        int dias = (hasta.Value - desde.Value).Days;
+        double monto = dias * alojamiento.PrecioPorNoche;
+        // Aplico descuento si corresponde
+        if (servicioSesion.Usuario != null && servicioSesion.Usuario.DescuentoProximaReserva > 0)
+        {
+            monto -= monto * servicioSesion.Usuario.DescuentoProximaReserva / 100;
+        }
+        reserva.MontoEstadia=monto;
+        return monto;
+    }
+    private void EditarCantidades()
+    {
+        editarCantidades = true;
+        mostrarInfoInquilinos = false;
+        reserva.Inquilinos.Clear(); // limpiamos los datos anteriores
+        dniFrenteArchivos.Clear();
+        dniDorsoArchivos.Clear();
+        mensaje = "";
+    }
+    private async Task ProcesarReserva()
+    {
+        try
+        {
+            int totalPersonas = (reserva.CantidadDeAdultos ?? 0) + (reserva.CantidadDeNiños ?? 0);
+            if (totalPersonas > alojamiento!.CapacidadMaxima)
+            {
+                mensaje = $"La cantidad total de personas ({totalPersonas}) supera la capacidad máxima del alojamiento ({alojamiento.CapacidadMaxima}).";
+                return;
+            }
+
+            await servicioSesion.InicializarUsuarioAsync();
+            reserva.IdUsuario = servicioSesion.Id;
+            if (!desde.HasValue || !hasta.HasValue || !alojamientoRepositorio.alojamientoDisponible(AlojamientoId, desde.Value, hasta.Value))
+            {
+                mensaje = "Alojamiento no disponible en las fechas seleccionadas.";
+                return;
+            }
+            if (!mostrarInfoInquilinos)
+            {
+                reserva.Inquilinos = Enumerable.Range(0, totalPersonas).Select(_ => new Inquilino()).ToList();
+                mostrarInfoInquilinos = true;
+                editarCantidades = false;
+                mensaje = "Debe ingresar los datos de los inquilinos para continuar.";
+                StateHasChanged();
+                return;
+            }
+            // Validación de datos de inquilinos
+            for (int i = 0; i < reserva.Inquilinos.Count; i++)
+            {
+                var inquilino = reserva.Inquilinos[i];
+
+                if (string.IsNullOrWhiteSpace(inquilino.Nombre))
+                {
+                    mensaje = $"El nombre del inquilino {i + 1} no puede estar vacío.";
+                    return;
+                }
+
+                if (alojamiento.TieneInformacionAdicional)
+                {
+                    if (!dniFrenteArchivos.ContainsKey(i) || !dniDorsoArchivos.ContainsKey(i))
+                    {
+                        mensaje = $"Debés subir la foto del frente y dorso del DNI para el inquilino {i + 1}.";
+                        return;
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(inquilino.Dni))
+                    {
+                        mensaje = $"El DNI del inquilino {i + 1} no puede estar vacío.";
+                        return;
+                    }
+                }
+            }
+            if (alojamiento.TieneInformacionAdicional)
+            {
+                reserva.ListaInformacionAdicional ??= new List<string>();
+
+                for (int i = 0; i < reserva.Inquilinos.Count; i++)
+                {
+                    if (!dniFrenteArchivos.ContainsKey(i) || !dniDorsoArchivos.ContainsKey(i))
+                    {
+                        mensaje = $"Debés subir las fotos del DNI del inquilino {i + 1}.";
+                        return;
+                    }
+
+                    var rutaFrente = await servicioArchivos.GuardarArchivoAsync(dniFrenteArchivos[i]);
+                    var rutaDorso = await servicioArchivos.GuardarArchivoAsync(dniDorsoArchivos[i]);
+
+                    reserva.ListaInformacionAdicional.Add($"Inquilino {i + 1}: {rutaFrente} (frente)");
+                    reserva.ListaInformacionAdicional.Add($"Inquilino {i + 1}: {rutaDorso} (dorso)");
+                }
+            }
+
+            reserva.InformacionInquilinos = System.Text.Json.JsonSerializer.Serialize(reserva.Inquilinos);
+            // Validar datos (incluyendo que la cantidad de adultos y niños no superen la capacidad maxima)
+            mensaje = await reservaAlta.Ejecutar(reserva);
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"No pudimos procesar la reserva: {ex.Message}";
+            
+        }
+    }
+}

@@ -1,0 +1,281 @@
+﻿@page "/misreservas"
+@using AL.UI.Components
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject CancelarReservaCasoDeUso cancelarReservaUseCase
+@inject ReservaConsultaTodosPorUsuario ReservaConsultaTodosPorUsuario
+@inject EliminarUsuario EliminarUsuarioUseCase
+@inject AlojamientoPuntuar AlojamientoPuntuar
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject IServicioSesion ServicioSesion
+@inject IServicioChat ServicioChat
+@inject IReservasRepositorio ReservasRepositorio
+@inject IUsuarioRepositorio UsuarioRepositorio
+@inject ITarjetaRepositorio TarjetaRepositorio
+
+<h3>Datos personales</h3>
+@if (_usuario == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Fecha de Nacimiento</th>
+                <th>Correo electrónico</th>
+                <th>Tarjeta</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                    <td>@_usuario.Nombre</td>
+                    <td>@_usuario.Apellido</td>
+                    <th>@_usuario.FechaDeNacimiento</th>
+                    <td>@_usuario.CorreoElectronico</td>
+                    <td> @_numeroTarjeta
+                        <button type="button" class="btn btn-sm btn-outline-primary ms-2" @onclick="IrAModificarTarjeta">
+                            Modificar
+                        </button>
+                    </td>
+            </tr>
+        </tbody>
+    </table>
+}
+
+@if (_usuario != null && _usuario.DescuentoProximaReserva > 0)
+{
+    <div class="alert alert-info" role="alert">
+        🎉 ¡Tenés un descuento del <strong>@_usuario.DescuentoProximaReserva%</strong> para tu próxima reserva!
+    </div>
+}
+
+<h3>Mis Reservas</h3>
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @((MarkupString)ErrorMessage)
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @SuccessMessage
+    </div>
+}
+@if (reservas == null || rol != RolUsuario.Usuario )
+{
+     <p><em>Cargando...</em></p>
+}
+else if (reservas.Count == 0)
+{
+    <p>No tenés reservas.</p>
+}
+else
+{
+    @foreach (var reserva in reservas)
+    {
+        <div class="card p-2 my-2">
+            <div class="d-flex justify-content-between align-items-start">
+                <div> 
+                    <p>Alojamiento: @(_datosAlojamiento[reserva.Id])</p>
+                    <p>Desde: @reserva.FechaInicioEstadia.ToShortDateString()</p>
+                    <p>Hasta: @reserva.FechaFinEstadia.ToShortDateString()</p>
+                    <p>Monto: $@reserva.MontoEstadia</p>
+                </div>
+                <span class="badge bg-secondary fs-6">@reserva.EstadoReserva</span>
+            </div>
+            <div class="my-2"></div>
+            <div class="d-flex justify-content-between align-items-end mt-2" style="height: 40px;">
+                <!-- Estrellas a la izquierda -->
+                <div>
+                    @if(reserva.Puntuacion == -1)
+                    {
+                        <p class="mb-0 text-warning">Puntuar Alojamiento:</p>
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            var puntuacion = i;
+                            <button class="btn btn-link p-0"
+                                style="font-size: 1.5rem; color:@((puntuaciones.ContainsKey(reserva.Id) && puntuaciones[reserva.Id] >= puntuacion) ? "gold" : "#ccc")"
+                                @onclick="async () => await Puntuar(reserva.Id, puntuacion)">
+                                ★
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <p class="mb-0 text-warning">Mi Puntuación: </p>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <span style="font-size: 1.5rem; color:@(i <= reserva.Puntuacion ? "gold" : "#ccc")">★</span>
+                            }
+                            <button class="btn btn-link p-0" @onclick="() => Comentar(reserva.Id)" title="Añadir Comentario">
+                            + Añadir Comentario
+                            </button>
+                        </div>
+                    }
+                </div>
+                <!-- Botones a la derecha -->
+                <div>
+                    @if (reserva.FechaInicioEstadia > DateTime.Now)
+                    {
+                        <button class="btn btn-outline-danger position-relative me-2" style="min-width: 80px;" @onclick="() => Cancelar(reserva.Id)">
+                        Cancelar
+                        </button>
+                    }
+                    @if(reserva.EstadoReserva == EstadoReserva.Finalizada || reserva.EstadoReserva == EstadoReserva.Confirmada || reserva.EstadoReserva == EstadoReserva.EnCurso)
+                    {
+                        <button class="btn btn-outline-primary position-relative me-2" @onclick="() => IrAlChat(reserva.Id)">
+                        Chat
+                        @if (reserva.MensajesNoLeidos > 0)
+                        {
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                @reserva.MensajesNoLeidos
+                                <span class="visually-hidden">mensajes no leídos</span>
+                            </span>
+                        }
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+
+    <div class="d-flex justify-content-end mt-4">
+        <button class="btn btn-danger" @onclick="() => mostrarConfirmacion = true">
+            Eliminar mi cuenta
+        </button>
+    </div>
+    @if (mostrarConfirmacion)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmar eliminación</h5>
+                        <button type="button" class="btn-close" @onclick="() => mostrarConfirmacion = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro de que querés eliminar tu cuenta? Esta acción no se puede deshacer.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="() => mostrarConfirmacion = false">Cancelar</button>
+                        <button class="btn btn-danger" @onclick="EliminarCuenta">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+   
+
+@code {
+
+    public RolUsuario rol => ServicioSesion.Rol;
+    public int usuario_Actual => ServicioSesion.Id;
+    private List<Reserva> reservas = new();
+    private bool _usuarioInicializado = false;
+    Usuario _usuario = new Usuario();
+    String _numeroTarjeta = string.Empty;
+    String ErrorMessage { get; set; } = string.Empty;
+    String SuccessMessage { get; set; } = string.Empty;
+    private Dictionary<int, int> puntuaciones = new(); // idReserva -> puntuación
+    private Dictionary<int, String> _datosAlojamiento = new();
+    [Inject] IJSRuntime? JS { get; set; }
+    
+    private void IrAModificarTarjeta()
+    {
+        NavigationManager.NavigateTo("/modificartarjeta");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_usuarioInicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            if (ServicioSesion.Rol != RolUsuario.Usuario)
+            {
+                NavigationManager.NavigateTo("/", true);
+
+            }
+            var usuario = UsuarioRepositorio.ObtenerPorId(ServicioSesion.Id);
+            if (usuario != null)
+            {
+                _usuario = usuario;
+                _usuarioInicializado = true;
+                ServicioSesion.IniciarSesion();
+                _numeroTarjeta = TarjetaRepositorio.ObtenerPorIdUltimosCuatro(usuario.TarjetaId);
+                reservas = ReservaConsultaTodosPorUsuario.Ejecutar(ServicioSesion.Id);
+                foreach (var reserva in reservas)
+                {
+                    Alojamiento? alojamiento =await AlojamientoRepositorio.ObtenerPorId(reserva.IdAlojamiento);
+                    if (alojamiento != null)
+                    {
+                        _datosAlojamiento[reserva.Id] = $"{alojamiento.Nombre}, {alojamiento.Ciudad}, {alojamiento.Direccion}";
+                    }
+                }
+            }
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar(int idReserva)
+    {
+        var mensaje = cancelarReservaUseCase.CancelarReserva(idReserva);
+        Console.WriteLine(mensaje);
+        OnInitialized();
+    }
+    private async Task Puntuar(int idReserva, int valor){
+        if (valor < 1 || valor > 5) return;
+        try{
+            puntuaciones[idReserva] = valor;
+            await AlojamientoPuntuar.Ejecutar(idReserva, valor);
+            var reserva = reservas.FirstOrDefault(r => r.Id == idReserva);
+            if (reserva != null)
+                reserva.Puntuacion = valor;
+
+            ErrorMessage = string.Empty;
+            SuccessMessage = "¡Puntuación guardada correctamente!";
+            StateHasChanged();
+        }
+        catch(Exception ex)
+        {
+            SuccessMessage = string.Empty;
+            ErrorMessage = $"{ex.Message}";
+        }
+    }
+    public void Comentar(int idReserva){
+        //Lógica para añadir un comentario
+    }
+    private void IrAlChat(int idReserva)
+    {
+        NavigationManager.NavigateTo($"/Chat/{idReserva}");
+    }
+    bool mostrarConfirmacion = false;
+    private async Task EliminarCuenta()
+    {
+        try
+        {
+            bool eliminado = EliminarUsuarioUseCase.Ejecutar(ServicioSesion.Id, out string error);
+            if (eliminado)
+            {
+                await ServicioSesion.LogoutAsync();
+                NavigationManager.NavigateTo("/", true);
+            }
+            else
+            {
+                ErrorMessage = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error al eliminar la cuenta: {ex.Message}";
+        }
+        mostrarConfirmacion = false;
+    }
+}

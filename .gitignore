@@ -1,0 +1,3 @@
+// filepath: .gitignore
+bin/
+obj/

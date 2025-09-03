@@ -1,0 +1,47 @@
+﻿@inject IServicioSesion Sesion
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+@implements IDisposable
+
+
+<div class="top-row px-4">
+    <header class="d-flex justify-content-end p-2">
+        <!-- Menú de usuario -->
+        <div class="ms-5">
+            <a href="/CuentaAdministrador" class="btn btn-secondary me-2">Cuenta</a>
+            <button @onclick="CerrarSesion" class="btn btn-primary">Cerrar Sesión</button>
+        </div>
+    </header>
+</div>
+
+
+
+@code {
+    private RolUsuario rol => Sesion.Rol;
+    private bool IsLoggedIn=false;
+    protected override void OnInitialized()
+    {
+        Sesion.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Sesion.OnChange -= StateHasChanged;
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoggedIn)
+        {
+            await Sesion.InicializarUsuarioAsync();
+            IsLoggedIn = true;
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+    }
+
+    private async Task CerrarSesion()
+    {
+        await Sesion.LogoutAsync();
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+}

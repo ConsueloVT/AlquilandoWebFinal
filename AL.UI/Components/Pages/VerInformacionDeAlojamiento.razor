@@ -1,0 +1,97 @@
+﻿@page "/alojamiento/{AlojamientoId:int}"
+@inject IAlojamientoRepositorio alojamientoRepo
+@using AL.Aplicacion.Entidades
+@inject IServicioSesion ServicioSesion
+
+<h3 class="mt-4 fw-bold">@alojamiento?.Nombre</h3>
+
+@if (alojamiento == null)
+{
+    <p>Cargando datos...</p>
+}
+else
+{
+    <div class="row mt-4">
+        <!-- Imágenes a la izquierda -->
+        <div class="col-md-7">
+            @if (alojamiento.Imagenes.Any())
+            {
+                @foreach (var img in alojamiento.Imagenes)
+                {
+                    <img src="@img" class="img-fluid rounded-3 mb-3" style="max-height: 400px; object-fit: cover;" />
+                }
+            }
+            else
+            {
+                <div class="border rounded-3 p-5 text-center text-muted">Sin imágenes disponibles</div>
+            }
+        </div>
+
+        <!-- Especificaciones a la derecha -->
+        <div class="col-md-5">
+            <div class="card p-4 shadow-sm border-0 rounded-4">
+                <p class="mb-1"><strong>País:</strong> @alojamiento.Pais</p>
+                <p class="mb-1"><strong>Ciudad:</strong> @alojamiento.Ciudad</p>
+                <p class="mb-1"><strong>Dirección:</strong> @alojamiento.Direccion</p>
+                <p class="mb-1"><strong>Capacidad máxima:</strong> @alojamiento.CapacidadMaxima</p>
+                <p class="mb-1"><strong>Dormitorios:</strong> @alojamiento.CantidadDormitorios</p>
+                <p class="mb-1"><strong>Camas:</strong> @alojamiento.CantidadCamas</p>
+                <p class="mb-1"><strong>Baños:</strong> @alojamiento.CantidadBaños</p>
+                <p class="mb-1"><strong>Estacionamiento:</strong> @(alojamiento.Estacionamiento ? "Sí" : "No")</p>
+                <p class="mb-3"><strong>Precio por noche:</strong> $@alojamiento.PrecioPorNoche</p>
+
+                <p class="text-muted">@alojamiento.Descripcion</p>
+                <div class="d-flex align-items-center justify-content-end mb-2">
+                    <span style="color: gold; font-size: 1.3rem;">★</span>
+                    <span class="ms-1 fw-bold" style="font-size: 1.1rem;">
+                        @(alojamientoRepo.ObtenerPromedio(alojamiento).ToString("0.00") ?? "-")
+                    </span>
+                </div>
+                <!-- Botón para reservar -->
+                <NavLink class="btn btn-primary" href="@UrlReserva">
+                    Solicitar reserva
+                </NavLink>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int AlojamientoId { get; set; }
+
+    private Alojamiento? alojamiento;
+    private bool IsLoggedIn = false;
+    private Usuario usuario=null!;
+
+    [Parameter, SupplyParameterFromQuery] public DateTime? desde { get; set; }
+
+    [Parameter, SupplyParameterFromQuery] public DateTime? hasta { get; set; }
+    private string UrlReserva => 
+            $"/SolicitarReserva/{AlojamientoId}?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        alojamiento = await alojamientoRepo.ObtenerPorId(AlojamientoId);
+        if (alojamiento == null)
+        {
+            Console.WriteLine("Alojamiento no encontrado.");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoggedIn)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            if(ServicioSesion.Usuario!=null){
+              usuario = ServicioSesion.Usuario;
+              ServicioSesion.IniciarSesion();
+            } 
+            IsLoggedIn = true;
+            
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+
+    }
+}

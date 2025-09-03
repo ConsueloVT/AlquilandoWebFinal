@@ -1,0 +1,192 @@
+﻿@page "/modificartarjeta"
+@inject NavigationManager NavigationManager
+@inject ITarjetaRepositorio TarjetaRepositorio
+@inject IServicioSesion ServicioSesion
+@inject IUsuarioRepositorio UsuarioRepositorio
+@rendermode InteractiveServer
+
+<h3>Modificar Tarjeta</h3>
+
+@if (!_inicializado)
+{
+    <p><em>Cargando datos...</em></p>
+}
+else if (_guardadoExitoso)
+{
+    <div class="alert alert-success">¡Tarjeta actualizada correctamente!</div>
+    <button class="btn btn-primary" @onclick='() => NavigationManager.NavigateTo("/misreservas")'>Volver</button>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+
+    <form onsubmit="return false;">
+        <h4>Tarjeta</h4>
+
+        <div class="mb-3">
+            <label>Número:</label>
+            <input placeholder="Número de tarjeta (16 dígitos)" @bind="_tarjeta.Numero" class="form-control"
+                type="text" maxlength="16" inputmode="numeric" />
+
+            @if (!string.IsNullOrEmpty(_errorNumero))
+            {
+                <div class="text-danger">@_errorNumero</div>
+            }
+        </div>
+
+        <div class="mb-3">
+            <label>Nombre del Titular:</label>
+            <input placeholder="Nombre Titular" @bind="_tarjeta.NombreTitular" class="form-control" type="text" />
+            @if (!string.IsNullOrEmpty(_errorNombreTitular))
+            {
+                <div class="text-danger">@_errorNombreTitular</div>
+            }
+        </div>
+
+        <div class="mb-3">
+            <label>Fecha de Vencimiento:</label><br />
+            <select class="form-control d-inline w-auto" @bind="_mesVencimiento">
+                <option value="">MM</option>
+                @for (int m = 1; m <= 12; m++)
+                {
+                    <option value="@m.ToString("D2")">@m.ToString("D2")</option>
+                }
+            </select>
+            /
+            <select class="form-control d-inline w-auto" @bind="_anioVencimiento">
+                <option value="">YY</option>
+                @for (int y = DateTime.Now.Year % 100; y <= 50; y++)
+                {
+                    <option value="@y.ToString("D2")">@y.ToString("D2")</option>
+                }
+            </select>
+            @if (!string.IsNullOrEmpty(_errorFechaVencimiento))
+            {
+                <div class="text-danger mt-1">@_errorFechaVencimiento</div>
+            }
+        </div>
+
+        <div class="mb-3">
+            <label>Código de Seguridad:</label>
+            <input placeholder="Código de seguridad" @bind="_codigoSeguridadTexto" class="form-control"
+                type="text" maxlength="3" inputmode="numeric" />
+
+            @if (!string.IsNullOrEmpty(_errorCodigoSeguridad))
+            {
+                <div class="text-danger">@_errorCodigoSeguridad</div>
+            }
+        </div>
+
+        <button class="btn btn-success" @onclick="GuardarTarjeta">Guardar</button>
+        <button class="btn btn-secondary ms-2" type="button" @onclick='() => NavigationManager.NavigateTo("/misreservas")'>Cancelar</button>
+    </form>
+}
+
+@code {
+    private Tarjeta _tarjeta = new Tarjeta();
+    private bool _guardadoExitoso = false;
+    private string _mesVencimiento = "";
+    private string _anioVencimiento = "";
+    private string _error = "";
+    private bool _inicializado = false;
+    private string _codigoSeguridadTexto = "";
+    private string _errorNumero = "";
+    private string _errorNombreTitular = "";
+    private string _errorCodigoSeguridad = "";
+    private string _errorFechaVencimiento = "";
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_inicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            var usuario = UsuarioRepositorio.ObtenerPorId(ServicioSesion.Id);
+
+            if (usuario == null || usuario.TarjetaId == 0)
+            {
+                NavigationManager.NavigateTo("/misreservas", true);
+                return;
+            }
+
+            var tarjetaExistente = TarjetaRepositorio.ObtenerPorId(usuario.TarjetaId);
+            if (tarjetaExistente != null)
+            {
+                // Copiamos solo el ID, no los datos sensibles
+                _tarjeta.Id = tarjetaExistente.Id;
+            }
+
+            _inicializado = true;
+            StateHasChanged();
+        }
+    }
+    private void GuardarTarjeta()
+    {
+        _errorNumero = "";
+        _errorNombreTitular = "";
+        _errorCodigoSeguridad = "";
+        _errorFechaVencimiento = "";
+        _error = ""; // opcional: para mensajes generales
+
+        bool hayErrores = false;
+
+        if (string.IsNullOrWhiteSpace(_tarjeta.Numero) || _tarjeta.Numero.Length != 16 || !_tarjeta.Numero.All(char.IsDigit))
+        {
+            _errorNumero = "El número de tarjeta debe tener exactamente 16 dígitos (sin letras ni símbolos).";
+            hayErrores = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(_tarjeta.NombreTitular) || _tarjeta.NombreTitular.Any(char.IsDigit))
+        {
+            _errorNombreTitular = "El nombre del titular es obligatorio y no debe contener números.";
+            hayErrores = true;
+        }
+
+
+        if (string.IsNullOrWhiteSpace(_codigoSeguridadTexto) || _codigoSeguridadTexto.Length != 3 || !_codigoSeguridadTexto.All(char.IsDigit))
+        {
+            _errorCodigoSeguridad = "El código de seguridad debe tener exactamente 3 dígitos (sin letras ni símbolos).";
+            hayErrores = true;
+        }
+
+        if (string.IsNullOrEmpty(_mesVencimiento) || string.IsNullOrEmpty(_anioVencimiento))
+        {
+            _errorFechaVencimiento = "Debe seleccionar mes y año de vencimiento.";
+            hayErrores = true;
+        }
+        else if (int.TryParse(_mesVencimiento, out int mes) && int.TryParse(_anioVencimiento, out int anio))
+        {
+            int anioCompleto = 2000 + anio;
+            DateTime fechaVencimiento = new DateTime(anioCompleto, mes, 1).AddMonths(1).AddDays(-1);
+
+            if (fechaVencimiento < DateTime.Now.Date)
+            {
+                _errorFechaVencimiento = "La tarjeta ingresada está vencida.";
+                hayErrores = true;
+            }
+            else
+            {
+                _tarjeta.FechaVencimiento = $"{_mesVencimiento}/{_anioVencimiento}";
+            }
+        }
+        else
+        {
+            _errorFechaVencimiento = "Fecha de vencimiento inválida.";
+            hayErrores = true;
+        }
+
+        if (hayErrores)
+        {
+            _guardadoExitoso = false;
+            return;
+        }
+
+        _tarjeta.CodigoSeguridad = int.Parse(_codigoSeguridadTexto);
+        TarjetaRepositorio.Actualizar(_tarjeta);
+        _guardadoExitoso = true;
+    }
+
+}

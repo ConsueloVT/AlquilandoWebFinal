@@ -1,0 +1,236 @@
+﻿@page "/usuarios"
+@layout AL.UI.Components.Layout.AdminLayout
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject IUsuarioRepositorio repoUsuario
+@inject IServicioSesion servicioSesion
+@inject IReservasRepositorio reservasRepositorio
+
+<h3>Usuarios registrados</h3>
+
+@if (!sesionInicializada)
+{
+    <p>Cargando permisos...</p>
+    @if (!string.IsNullOrEmpty(errorSesion))
+    {
+        <p class="text-danger">@errorSesion</p>
+    }
+}
+else if (!servicioSesion.SesionIniciada)
+{
+    <p class="text-danger">Debe iniciar sesión para acceder a esta sección.</p>
+}
+else if (servicioSesion.Rol == RolUsuario.Administrador || servicioSesion.Rol == RolUsuario.Encargado)
+{
+    <!-- Bloque de filtros -->
+    <div class="mb-3">
+        <label class="form-label">Tipo de filtro:</label>
+        <select @bind="filtroSeleccionado" class="form-select">
+            <option value="">Seleccionar...</option>
+            <option value="ReservasUltimosMeses">Reservas en los últimos meses</option>
+            <option value="Nombre">Nombre</option>
+            <option value="Apellido">Apellido</option>
+        </select>
+
+        @if (filtroSeleccionado == "ReservasUltimosMeses")
+        {
+            <div class="mt-2">
+                <label class="form-label">Cantidad de meses:</label>
+                <InputNumber @bind-Value="cantidadMeses" class="form-control" min="0" DisplayName="Cantidad de meses pasados desde la ultima reserva realizada." />
+            </div>
+        }
+        else if (filtroSeleccionado == "Nombre" || filtroSeleccionado == "Apellido")
+        {
+            <div class="mt-2">
+                <label class="form-label">Valor:</label>
+                <InputText @bind-Value="valorFiltroTexto" class="form-control" />
+            </div>
+        }
+
+        <button class="btn btn-primary mt-3" @onclick="@(() => AplicarFiltro(true))">Aplicar Filtro</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert alert-info">@mensaje</div>
+    }
+
+    <!-- Mostrar resultados -->
+    @if (usuariosFiltrados != null)
+    {
+        @if (usuariosFiltrados.Count == 0 && filtroAplicado)
+        {
+            <div class="alert alert-warning">
+                No se encontraron resultados que coincidan con los criterios de búsqueda.
+            </div>
+        }
+        else if (usuariosFiltrados.Count > 0)
+        {
+            <div class="mt-4 mb-3">
+                <h5>Porcentaje de descuento</h5>
+                <div class="d-flex">
+                    <InputNumber @bind-Value="descuentoPorcentaje" class="form-control w-25 me-2" min="0" max="100" />
+                    <button class="btn btn-success" @onclick="AplicarDescuento">Aplicar descuento a todos</button>
+                </div>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Apellido</th>
+                        <th>Email</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in usuariosFiltrados)
+                    {
+                        <tr>
+                            <td>@u.Id</td>
+                            <td>@u.Nombre</td>
+                            <td>@u.Apellido</td>
+                            <td>@u.CorreoElectronico</td>
+                            <td>
+                                @if (u.EstaHabilitado)
+                                {
+                                    <button class="btn btn-danger btn-sm" @onclick="() => DeshabilitarUsuario(u.Id)">Deshabilitar</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-success btn-sm" @onclick="() => HabilitarUsuario(u.Id)">Habilitar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+}
+else
+{
+    <p class="text-danger">No tiene permiso para acceder a esta sección.</p>
+}
+
+@code {
+    private int cantidadMeses = 1;
+    private string valorFiltroTexto = "";
+    private string filtroSeleccionado = "";
+    private string mensaje = "";
+    private bool sesionInicializada = false;
+    private bool filtroAplicado = false;
+    private string? errorSesion;
+    private int descuentoPorcentaje = 0;
+
+    private List<Usuario> usuariosFiltrados = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!NavigationManager.Uri.Contains("__prerender"))
+            {
+                try
+                {
+                    await servicioSesion.InicializarUsuarioAsync();
+                }
+                catch (Exception ex)
+                {
+                    errorSesion = ex.Message;
+                }
+                sesionInicializada = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void AplicarFiltro(bool limpiarMensaje = false)
+    {
+        if (limpiarMensaje)
+            mensaje = string.Empty;
+
+        filtroAplicado = true;
+        usuariosFiltrados.Clear();
+
+        if (filtroSeleccionado == "ReservasUltimosMeses")
+        {
+            usuariosFiltrados = repoUsuario.ListarUsuariosConReservasEnUltimosMeses(cantidadMeses);
+        }
+        else if (filtroSeleccionado == "Nombre")
+        {
+            usuariosFiltrados = repoUsuario.ListarTodos()
+            .Where(u => u.Nombre.Contains(valorFiltroTexto, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        }
+        else if (filtroSeleccionado == "Apellido")
+        {
+            usuariosFiltrados = repoUsuario.ListarTodos()
+            .Where(u => u.Apellido.Contains(valorFiltroTexto, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        }
+    }
+
+    private void HabilitarUsuario(int usuarioId)
+    {
+        try
+        {
+            var casoDeUso = new HabilitarUsuarioCasoDeUso(repoUsuario);
+            casoDeUso.Ejecutar(usuarioId);
+            mensaje = "Usuario habilitado correctamente.";
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al habilitar: {ex.Message}";
+        }
+
+        AplicarFiltro(); // mantiene el mensaje
+    }
+
+    private void DeshabilitarUsuario(int usuarioId)
+    {
+        try
+        {
+            var casoDeUso = new DeshabilitarUsuarioCasoDeUso(repoUsuario, reservasRepositorio);
+            bool reservasFuturas = reservasRepositorio.TieneReservasFuturasPorUsuario(usuarioId);
+            casoDeUso.Ejecutar(usuarioId);
+
+            if (reservasFuturas)
+            {
+                mensaje = "Usuario deshabilitado correctamente. Se han eliminado las reservas futuras.";
+            }
+            else
+            {
+                mensaje = "Usuario deshabilitado correctamente.";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al deshabilitar: {ex.Message}";
+        }
+
+        AplicarFiltro(); // mantiene el mensaje
+    }
+
+    private void AplicarDescuento()
+    {
+        if (descuentoPorcentaje < 0 || descuentoPorcentaje > 100)
+        {
+            mensaje = "El descuento debe ser un valor entre 0 y 100.";
+            return;
+        }
+        try
+        {
+            foreach (var usuario in usuariosFiltrados)
+            {
+                repoUsuario.AsignarDescuento(usuario.Id, descuentoPorcentaje);
+            }
+            mensaje = $"Se aplicó un {descuentoPorcentaje}% de descuento a {usuariosFiltrados.Count} usuario/s.";
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al aplicar descuento: {ex.Message}";
+        }
+    }
+}

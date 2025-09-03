@@ -1,0 +1,111 @@
+﻿@page "/BandejaDeEntrada"
+
+@rendermode InteractiveServer
+@inject IReservasRepositorio ReservasRepositorio
+@inject ReservaConsultaTodos ReservaConsultaTodos
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject NavigationManager NavigationManager
+@inject IServicioSesion ServicioSesion
+
+<button @onclick="VolverAtras" class="btn btn-primary">Volver</button>
+
+<h3> Conversaciones </h3>
+
+@if (_reservas is null)
+{
+    <p>Cargando conversaciones...</p>
+}
+else if (!_reservas.Any())
+{
+    <p>No hay conversaciones</p>
+}
+else
+{
+@foreach (var reserva in _reservas)
+{
+    <div class="card p-3 my-3 shadow-sm position-relative">
+        <span class="badge fs-6 position-absolute top-0 end-0 mt-2 me-2
+            @(reserva.EstadoReserva == EstadoReserva.Finalizada ? "bg-secondary" :
+              reserva.EstadoReserva == EstadoReserva.Confirmada ? "bg-success" :
+              reserva.EstadoReserva == EstadoReserva.EnCurso ? "bg-info text-light" : "bg-light text-light")">
+            @reserva.EstadoReserva
+        </span>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-bold mb-2">
+                    Reserva: @(_datosAlojamiento[reserva.Id])
+                </div>
+                <div class="d-flex align-items-center gap-4 flex-wrap">
+                    <span><strong>Desde:</strong> @reserva.FechaInicioEstadia.ToShortDateString()</span>
+                    <span><strong>Hasta:</strong> @reserva.FechaFinEstadia.ToShortDateString()</span>
+                    @if(reserva.EstadoReserva == EstadoReserva.Finalizada || reserva.EstadoReserva == EstadoReserva.Confirmada || reserva.EstadoReserva == EstadoReserva.EnCurso)
+                    {
+                        <button class="btn btn-primary ms-3 position-relative" @onclick="() => IrAlChat(reserva.Id)">
+                            Chat
+                            @if (reserva.MensajesNoLeidos > 0)
+                            {
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    @reserva.MensajesNoLeidos
+                                    <span class="visually-hidden">mensajes no leídos</span>
+                                </span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+}
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-info mt-2">@mensaje</div>
+}
+@code {
+    private RolUsuario rol => ServicioSesion.Rol;
+    List<Reserva>? _reservas= new();
+    Dictionary<int, String> _datosAlojamiento = new();
+    private bool _usuarioInicializado = false;
+    private string mensaje = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_usuarioInicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            if (ServicioSesion.Rol == RolUsuario.Invitado )
+            {
+                NavigationManager.NavigateTo("/", true);
+
+            }
+            if(ServicioSesion.Usuario!=null){
+              _usuarioInicializado = true;
+              ServicioSesion.IniciarSesion();
+            }
+
+            _reservas = ReservaConsultaTodos.Ejecutar(ServicioSesion.Id); 
+            foreach (var reserva in _reservas)
+            {
+                Alojamiento? alojamiento =await AlojamientoRepositorio.ObtenerPorId(reserva.IdAlojamiento);
+                if (alojamiento != null)
+                {
+                    _datosAlojamiento[reserva.Id] = $"{alojamiento.Nombre}, {alojamiento.Ciudad}, {alojamiento.Direccion}";
+                }
+            }
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+    }
+    private void IrAlChat(int idReserva)
+    {
+        NavigationManager.NavigateTo($"/Chat/{idReserva}");
+    }
+    void VolverAtras()
+    {
+        if(ServicioSesion.Rol == RolUsuario.Administrador)
+            NavigationManager.NavigateTo("/CuentaAdministrador");
+        else if(ServicioSesion.Rol == RolUsuario.Encargado)
+            NavigationManager.NavigateTo("/CuentaEncargado");
+
+    }
+
+}

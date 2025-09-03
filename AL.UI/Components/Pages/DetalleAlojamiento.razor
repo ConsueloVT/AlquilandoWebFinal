@@ -1,0 +1,51 @@
+﻿@page "/DetalleAlojamiento/{AlojamientoId:int}"
+@using AL.Aplicacion.Entidades
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+
+<PageTitle>Detalle del Alojamiento</PageTitle>
+
+<h3>@(alojamiento != null ? alojamiento.Nombre : "Cargando...")</h3>
+
+@if (alojamiento == null)
+{
+    <p>Cargando alojamiento...</p>
+}
+else
+{
+    <div class="card p-3">
+        <h4>@alojamiento.Nombre</h4>
+        <p><strong>Ubicación:</strong> @alojamiento.Ciudad, @alojamiento.Pais</p>
+        <p><strong>Dirección:</strong> @alojamiento.Direccion</p>
+        <p><strong>Descripción:</strong> @alojamiento.Descripcion</p>
+        <p><strong>Capacidad:</strong> @alojamiento.CapacidadMaxima personas</p>
+        <p><strong>Dormitorios:</strong> @alojamiento.CantidadDormitorios</p>
+        <p><strong>Camas:</strong> @alojamiento.CantidadCamas</p>
+        <p><strong>Baños:</strong> @alojamiento.CantidadBaños</p>
+        <p><strong>Precio por noche:</strong> $@alojamiento.PrecioPorNoche</p>
+        <p><strong>Estacionamiento:</strong> @(alojamiento.Estacionamiento ? "Sí" : "No")</p>
+
+        @if (alojamiento.Imagenes != null && alojamiento.Imagenes.Any())
+        {
+            <div class="row mt-3">
+                @foreach (var img in alojamiento.Imagenes)
+                {
+                    <div class="col-md-4 mb-2">
+                        <img src="@img" alt="Imagen del alojamiento" class="img-fluid rounded" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int AlojamientoId { get; set; }
+
+    private Alojamiento? alojamiento;
+
+    protected override void OnInitialized()
+    {
+        alojamiento = AlojamientoRepositorio.ObtenerTodos().FirstOrDefault(a => a.Id == AlojamientoId);
+    }
+}

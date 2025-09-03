@@ -1,0 +1,122 @@
+﻿@page "/resultados"
+@rendermode InteractiveServer
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject BuscarAlojamientoCasoDeUso Buscar
+@inject IServicioSesion ServicioSesion
+@inject NavigationManager Navigation
+
+<PageTitle>Resultados de Búsqueda</PageTitle> 
+
+<h3>Resultados para "@ciudad" entre @desde?.ToShortDateString() y @hasta?.ToShortDateString()</h3>
+@if (alojamientos != null && alojamientos.Any())
+{
+    <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-outline-secondary d-flex align-items-center"
+             @onclick="IrAFiltros">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16">
+                <rect y="3" width="16" height="2" rx="1"/>
+                <rect y="7" width="16" height="2" rx="1"/>
+                <rect y="11" width="16" height="2" rx="1"/>
+            </svg>
+            <span class="ms-2 fw-bold">Filtros</span>
+        </button>
+    </div>
+}
+
+
+@if (alojamientos == null)
+{
+    <p>Cargando alojamientos...</p>
+}
+else if (!alojamientos.Any())
+{
+    <div class="alert alert-danger mt-3">
+        <p>No hay coincidencias</p>
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var alojamiento in alojamientos)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <img src="@(alojamiento.Imagenes.FirstOrDefault() ?? "imagenes/default-image.jpg")" class="card-img-top" />
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0">@alojamiento.Nombre</h5>
+                            <span>
+                                <span style="color: gold; font-size: 1.3rem;">★</span>
+                                <span class="ms-1 fw-bold" style="font-size: 1.1rem;">
+                                    @(AlojamientoRepositorio.ObtenerPromedio(alojamiento).ToString("0.00") ?? "-")
+                                </span>
+                            </span>
+                        </div
+                        <p class="card-text">@alojamiento.Ciudad</p>
+                        <button class="btn btn-primary" @onclick="@(() => VerDetalle(alojamiento.Id))">Ver Detalles</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? ciudad {get  ; set;}
+    [Parameter] public DateTime? desde{ get; set; }
+    [Parameter] public DateTime? hasta {get;set;}
+    private List<Alojamiento> alojamientos = null!;
+    private string? ErrorMessage { get; set; }
+    private bool IsLoggedIn = false;
+    private Usuario usuario=null!;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoggedIn)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            if(ServicioSesion.Usuario!=null){
+              usuario = ServicioSesion.Usuario;
+              IsLoggedIn = true;
+              ServicioSesion.IniciarSesion();
+            } 
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+
+    }
+
+    protected override void OnParametersSet()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        ciudad = query["ciudad"];
+        desde = DateTime.TryParse(query["desde"], out var d) ? d : (DateTime?)null;
+        hasta = DateTime.TryParse(query["hasta"], out var h) ? h : (DateTime?)null;
+        try{
+            
+            if (!string.IsNullOrWhiteSpace(ciudad) && desde.HasValue && hasta.HasValue)
+            {
+                alojamientos = Buscar.Ejecutar(ciudad, desde.Value, hasta.Value)
+                .Where(a => a.Estado == EstadoPublicacion.Publicado)
+                .ToList();
+            }
+
+
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "";
+            ErrorMessage = $"{ex.Message}";
+        }
+
+    }
+    void VerDetalle(int id)
+    {
+        Navigation.NavigateTo($"/alojamiento/{id}?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}");
+    }
+    void IrAFiltros()
+    {
+        // Reenvía los parámetros de búsqueda actuales
+        Navigation.NavigateTo($"/FiltrarAlojamiento?ciudad={Uri.EscapeDataString(ciudad ?? "")}&desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}");
+    }
+}

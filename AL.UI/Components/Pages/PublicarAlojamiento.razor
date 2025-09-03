@@ -1,0 +1,233 @@
+﻿@page "/PublicarAlojamiento"
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@layout AL.UI.Components.Layout.AdminLayout
+@inject IServicioSesion ServicioSesion
+@inject AlojamientoAlta AlojamientoAlta
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject IAlojamientoValidador AlojamientoValidador
+
+<h3>Publicar Alojamiento</h3>
+
+<form>
+    <p>Nombre: <input placeholder="Nombre" @bind="_alojamiento.Nombre" class="form-control" required type="text"> </p> 
+    @if (!string.IsNullOrEmpty(ErrorNombre))
+    {
+        <div class="text-danger mb-2">@ErrorNombre</div>
+    }
+    <p>Pais: <input placeholder="Pais" @bind="_alojamiento.Pais" class="form_control" required type="text"> </p>
+    @if (!string.IsNullOrEmpty(ErrorPais))
+    {
+        <div class="text-danger mb-2">@ErrorPais</div>
+    }
+    <p>Ciudad: <input placeholder="Ciudad" @bind="_alojamiento.Ciudad" class="form-control" required type="text"></p>
+    @if (!string.IsNullOrEmpty(ErrorCiudad))
+    {
+        <div class="text-danger mb-2">@ErrorCiudad</div>
+    }
+    <p>Direccion: <input placeholder="Direccion" @bind="_alojamiento.Direccion" class="form-control" required type="text"></p>
+    @if (!string.IsNullOrEmpty(ErrorDireccion))
+    {
+        <div class="text-danger mb-2">@ErrorDireccion</div>
+    }
+    <p>Precio: <input placeholder="Precio" @bind="_alojamiento.PrecioPorNoche" class="form-control" required type="number"></p>
+    @if (!string.IsNullOrEmpty(ErrorPrecio))
+    {
+        <div class="text-danger mb-2">@ErrorPrecio</div>
+    }
+    <p>Capacidad: <input placeholder="Capacidad Máxima" @bind="_alojamiento.CapacidadMaxima" class="form-control" required type="number"> </p>
+    @if (!string.IsNullOrEmpty(ErrorCapacidad))
+    {
+        <div class="text-danger mb-2">@ErrorCapacidad</div>
+    }
+    <p>Dormitorios: <input placeholder="Dormitorios" @bind="_alojamiento.CantidadDormitorios" class="form-control" required type="number"> </p>
+    @if (!string.IsNullOrEmpty(ErrorDormitorios))   
+    {
+        <div class="text-danger mb-2">@ErrorDormitorios</div>
+    }
+    <p>Camas: <input placeholder="Camas" @bind="_alojamiento.CantidadCamas" class="form-control" required type="number"> </p>
+    @if (!string.IsNullOrEmpty(ErrorCamas))
+    {
+        <div class="text-danger mb-2">@ErrorCamas</div>
+    } 
+    <p>Baños: <input placeholder="Baños" @bind="_alojamiento.CantidadBaños" class="form-control" required type="number"> </p>
+    @if (!string.IsNullOrEmpty(ErrorBaños))
+    {
+        <div class="text-danger mb-2">@ErrorBaños</div>
+    }
+    <p>Descripcion: <input placeholder="Descripcion" @bind="_alojamiento.Descripcion" class="form-control" required type="text"></p>
+    @if (!string.IsNullOrEmpty(ErrorDescripcion))
+    {
+        <div class="text-danger mb-2">@ErrorDescripcion</div>
+    }
+    <p>Servicios: <input placeholder="Servicios" @bind="_alojamiento.Servicios" class="form-control" required type="text"></p>
+    @if (!string.IsNullOrEmpty(ErrorServicios))
+    {
+        <div class="text-danger mb-2">@ErrorServicios</div>
+    }
+    <p><input type="checkbox" @bind="_alojamiento.Estacionamiento"/>
+        <label class="ms-2"> ¿Tiene estacionamiento?</label> </p>
+    <p><label>Tipo de reembolso:</label> 
+        <select class="form-control" placeholder="Seleccione.." @bind="_alojamiento.TipoDeReembolso">
+            <option value="">Seleccione...</option>
+            <option value="NoReembolsable">Sin Reembolso</option>
+            <option value="ReembolsoParcial">Con Reembolso Parcial</option>
+            <option value="ReembolsoTotal">Con Reembolso Total</option>
+        </select> </p>
+    <input type="checkbox" @bind="_alojamiento.TieneInformacionAdicional" />
+        <label class="ms-2">¿Requiere que el huésped suba información adicional?</label>
+
+    @if (_alojamiento.TieneInformacionAdicional)
+    {
+        <p> <label>Información adicional requerida:</label>
+            <textarea class="form-control" @bind="_alojamiento.InformacionAdicional" placeholder="Ej: Foto de DNI, certificado de vacunación, etc." rows="3"></textarea>
+        </p>
+    }
+    <p> <label>Ingrese 1 imágen:</label>
+    <InputFile OnChange="OnInputFileChange" accept="image/*" /> </p>
+    @if (!string.IsNullOrEmpty(_previewUrl))
+    {
+    <div class="mb-3">
+        <label>Vista previa:</label>
+        <img src="@_previewUrl" style="max-width:120px; max-height:120px; border:1px solid #ccc; border-radius:8px;" />
+    </div>
+    }
+    (podrá ingresar más imágenes durante la edición)
+</form> 
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @((MarkupString)ErrorMessage)
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @SuccessMessage
+    </div>
+}
+<div class="container">
+    <button class="btn btn-primary" @onclick="@(async () => await RegistrarAlojamiento())">Publicar</button>
+    <button @onclick="VolverMenu" class="btn btn-primary">Volver</button>
+</div>
+
+
+
+@code {
+    public RolUsuario rol => ServicioSesion.Rol;
+    Alojamiento _alojamiento = new Alojamiento();
+    string ErrorMessage { get; set; }=null!;
+    string SuccessMessage {get;set;}=null!;
+    private IBrowserFile? _imagen;
+    private String filePath="";
+    private string? _previewUrl;
+    private bool _usuarioInicializado = false;
+    string ErrorNombre { get; set; } = "";
+    string ErrorPais { get; set; } = "";
+    string ErrorCiudad { get; set; } = "";
+    string ErrorDireccion { get; set; } = "";
+    string ErrorPrecio { get; set; } = "";
+    string ErrorCapacidad { get; set; } = "";
+    string ErrorDormitorios { get; set; } = "";
+    string ErrorCamas { get; set; } = "";
+    string ErrorBaños { get; set; } = "";
+    string ErrorDescripcion { get; set; } = "";
+    string ErrorServicios { get; set; } = "";
+    string ErrorTipoReembolso { get; set; } = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_usuarioInicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            _usuarioInicializado = true;
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+    }
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        _imagen = e.File;
+
+        // Vista previa
+        using var stream = _imagen.OpenReadStream(5 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        _previewUrl = $"data:{_imagen.ContentType};base64,{base64}";
+    }
+    private async Task RegistrarAlojamiento()
+    {
+        
+        try
+        {
+            ErrorNombre = ErrorPais = ErrorCiudad = ErrorDireccion = ErrorPrecio = ErrorCapacidad = ErrorDormitorios = ErrorCamas = ErrorBaños = ErrorDescripcion = ErrorServicios = ErrorTipoReembolso = "";
+            ErrorMessage = "";
+            SuccessMessage = "";
+            bool _camposCompletados = true;
+
+            if (string.IsNullOrWhiteSpace(_alojamiento.Nombre)) { ErrorNombre = "Completa la casilla"; _camposCompletados = false; }
+            if (string.IsNullOrWhiteSpace(_alojamiento.Pais)) { ErrorPais = "Completa la casilla"; _camposCompletados = false; }
+            if (string.IsNullOrWhiteSpace(_alojamiento.Ciudad)) { ErrorCiudad = "Completa la casilla"; _camposCompletados = false; }
+            if (string.IsNullOrWhiteSpace(_alojamiento.Direccion)) { ErrorDireccion = "Completa la casilla"; _camposCompletados = false; }
+            if (_alojamiento.PrecioPorNoche <= 0) { ErrorPrecio = "Completa la casilla"; _camposCompletados = false; }
+            if (_alojamiento.CapacidadMaxima <= 0) { ErrorCapacidad = "Completa la casilla"; _camposCompletados = false; }
+            if (_alojamiento.CantidadDormitorios <= 0) { ErrorDormitorios = "Completa la casilla"; _camposCompletados = false; }
+            if (_alojamiento.CantidadCamas <= 0) { ErrorCamas = "Completa la casilla"; _camposCompletados = false; }
+            if (_alojamiento.CantidadBaños <= 0) { ErrorBaños = "Completa la casilla"; _camposCompletados = false; }
+            if (string.IsNullOrWhiteSpace(_alojamiento.Descripcion)) { ErrorDescripcion = "Completa la casilla"; _camposCompletados = false; }
+            if (string.IsNullOrWhiteSpace(_alojamiento.Servicios)) { ErrorServicios = "Completa la casilla"; _camposCompletados = false; }
+            if(_camposCompletados)
+            {
+                // Guardar imagen si hay
+                if (_imagen != null)
+                {
+                    var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                    if (!Directory.Exists(uploadsPath)) Directory.CreateDirectory(uploadsPath);
+
+                        var uniqueFileName = $"{Guid.NewGuid()}_{_imagen.Name}";
+                    filePath = Path.Combine(uploadsPath, uniqueFileName);
+
+                    using (var stream = _imagen.OpenReadStream(5 * 1024 * 1024))
+                    using (var fileStream = File.Create(filePath))
+                    {
+                        await stream.CopyToAsync(fileStream);
+                    }
+ 
+                    // Guarda la ruta relativa en el modelo
+                    _alojamiento.Imagenes.Add($"/uploads/{uniqueFileName}");
+                }
+                // Ejecutar el caso de uso para agregar un alojamiento
+                AlojamientoAlta.Ejecutar(_alojamiento,rol);
+            
+                _alojamiento = new Alojamiento();
+                _imagen = null;
+                _previewUrl = null;
+                ErrorMessage = "";
+                SuccessMessage = "La publicación se ha hecho exitosamente.";
+            }
+        }
+        catch(Exception msj)
+        {
+            SuccessMessage = "";
+            ErrorMessage = $"{msj.Message}";
+            Console.WriteLine($"Exception: {msj}");
+            // Borra el archivo subido si ocurre un error
+            if (_imagen != null)
+            {
+                try
+                {
+                    if (File.Exists(filePath))
+                    File.Delete(filePath);
+                }
+                catch { /* Ignora errores de borrado */ }
+            }
+        }
+    }
+
+    private void VolverMenu()
+    {
+        NavigationManager.NavigateTo("/CuentaAdministrador");  
+    }
+
+}

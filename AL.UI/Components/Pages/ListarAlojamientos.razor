@@ -1,0 +1,145 @@
+﻿@page "/alojamientos"
+@layout AL.UI.Components.Layout.AdminLayout
+@rendermode InteractiveServer
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject NavigationManager NavigationManager
+@inject IServicioSesion ServicioSesion
+
+<h3>Alojamientos Publicados</h3>
+
+<button @onclick="VolverAtras" class="btn btn-primary">Volver</button>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-info mt-2">@mensaje</div>
+}
+
+@if (_alojamientos is null)
+{
+    <p>Cargando alojamientos...</p>
+}
+else if (!_alojamientos.Any())
+{
+    <p>No hay alojamientos publicados.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Ciudad</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var alojamiento in _alojamientos)
+            {
+                <tr>
+                    <td>@alojamiento.Nombre</td>
+                    <td>@alojamiento.Ciudad</td>
+                    <td>
+                        <div class="card" style="width: 12rem;">
+                            <div class="card-body">
+                                <h5 class="card-title">Editar</h5>
+                                <a href="/editar-alojamiento/@alojamiento.Id" class="btn btn-warning btn-sm">Ir</a>
+                                @if (alojamiento.Estado == EstadoPublicacion.Publicado)
+                                {
+                                    <button class="btn btn-danger btn-sm"
+                                        @onclick="() => Archivar(alojamiento.Id)">Archivar</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-success btn-sm"
+                                        @onclick="() => Desarchivar(alojamiento.Id)">Desarchivar</button>
+                                }
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<Alojamiento>? _alojamientos = new();
+    private bool _usuarioInicializado = false;
+    private string mensaje = "";
+
+    [Inject] private ArchivarPublicacionCasoDeUso? ArchivarPublicacion { get; set; }
+    [Inject] private DesarchivarPublicacionCasoDeUso? DesarchivarPublicacion { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_usuarioInicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            _usuarioInicializado = true;
+
+            if (ServicioSesion.Rol != RolUsuario.Administrador)
+            {
+                NavigationManager.NavigateTo("/", true);
+                return;
+            }
+
+            CargarAlojamientos();
+            StateHasChanged();
+        }
+    }
+
+    public void CargarAlojamientos()
+    {
+        _alojamientos = AlojamientoRepositorio.ObtenerTodos();
+    }
+
+    void VolverAtras()
+    {
+        NavigationManager.NavigateTo("/CuentaAdministrador");
+    }
+
+    async Task Archivar(int id)
+    {
+        try
+        {
+            if (ArchivarPublicacion != null)
+            {
+                mensaje = await ArchivarPublicacion.Ejecutar(id);
+            }
+            else
+            {
+                mensaje = "No se pudo archivar la publicación: servicio no disponible.";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = ex.Message;
+        }
+
+        CargarAlojamientos();
+        StateHasChanged();
+    }
+
+    async Task Desarchivar(int id)
+    {
+        try
+        {
+            if (DesarchivarPublicacion != null)
+            {
+                await DesarchivarPublicacion.Ejecutar(id);
+                mensaje = $"Publicación desarchivada exitosamente.";
+            }
+            else
+            {
+                mensaje = "No se pudo desarchivar la publicación: servicio no disponible.";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = ex.Message;
+        }
+
+        CargarAlojamientos();
+        StateHasChanged();
+    }
+}

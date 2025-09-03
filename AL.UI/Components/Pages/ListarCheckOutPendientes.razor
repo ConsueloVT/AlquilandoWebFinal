@@ -1,0 +1,73 @@
+﻿@page "/check-outs-pendientes"
+@inject IReservasRepositorio repoReserva
+@inject IServicioSesion servicioSesion
+@inject NavigationManager nav
+<h3>Reservas pendientes de Check-Out</h3>
+
+
+    @if (reservasPendientes == null)
+    {
+        <p>Cargando reservas...</p>
+    }
+    else if (reservasPendientes.Count == 0)
+    {
+        <p>No hay reservas pendientes de check-out.</p>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID Reserva</th>
+                    <th>Alojamiento</th>
+                    <th>Inquilino</th>
+                    <th>Fecha Ingreso</th>
+                    <th>Fecha Salida</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var reserva in reservasPendientes)
+                {
+                    <tr>
+                        <td>@reserva.Id</td>
+                        <td>@reserva.IdAlojamiento</td>
+                        <td>@reserva.IdUsuario</td>
+                        <td>@reserva.FechaInicioEstadia.ToString("dd/MM/yyyy")</td>
+                        <td>@reserva.FechaFinEstadia.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <a class="btn btn-sm btn-primary" href="/checkout/@reserva.Id">Realizar Check-Out</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+
+@code{
+    private List<Reserva> reservasPendientes= null!;
+    private bool _usuarioInicializado = false;
+
+    protected override void OnInitialized()
+    {
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender){
+         if (firstRender && !_usuarioInicializado)
+        {
+            await servicioSesion.InicializarUsuarioAsync();
+
+            _usuarioInicializado = true;
+
+            if (servicioSesion.Rol != RolUsuario.Encargado)
+            return;
+            var todas = repoReserva.ObtenerTodos();
+            reservasPendientes = todas
+            .Where(r => string.IsNullOrEmpty(r.EstadoCheckOut))
+            .ToList();
+            StateHasChanged();
+        }
+        
+    }
+}

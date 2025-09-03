@@ -1,0 +1,72 @@
+﻿@page "/IniciarSesion"
+@rendermode InteractiveServer
+
+@inject NavigationManager NavigationManager
+@inject IServicioSesion ServicioSesion
+
+<h3>Iniciar Sesion</h3>
+<EditForm Model="this" OnValidSubmit="OnSubmit">
+    <InputText @bind-Value="Email" placeholder="Email" class="form-control mb-2" />
+    <InputText @bind-Value="Password" placeholder="Contraseña" type="password" class="form-control mb-2" />
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+    <button type="submit" class="btn btn-primary" disabled="@_procesando">Ingresar</button>
+    @if (_procesando)
+    {
+        <span class="ms-2">Procesando...</span>
+    }
+</EditForm>
+
+<div class="mt-3">
+    <a href="/Registrarse">¿No tienes cuenta? Regístrate aquí</a>
+</div>
+<div class="mt-3">
+    <a href="/recuperar">¿Olvidaste tu contraseña?</a>        
+</div>
+
+@code {
+    public String Email { get; set; } = string.Empty;
+    public string Password { get; set; } =  string.Empty;
+    public String? ErrorMessage { get; set; } = string.Empty;
+    private bool _procesando = false;
+    private async Task OnSubmit()
+    {
+        _procesando = true;
+        try
+        {
+            var result = await ServicioSesion.Loggin(Email, Password);
+            if (result)
+            {
+                ServicioSesion.IniciarSesion();
+                // Redirige según el rol
+                if (ServicioSesion.Rol == RolUsuario.Administrador)
+                {
+
+                    NavigationManager.NavigateTo("/CuentaAdministrador");
+                }
+                else if(ServicioSesion.Rol == RolUsuario.Usuario)
+                {
+
+                    NavigationManager.NavigateTo("/misreservas");
+                }
+                else{
+                     NavigationManager.NavigateTo("/CuentaEncargado");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ex is UsuarioDeshabilitadoException)
+                ErrorMessage = ex.Message;
+
+            else
+                ErrorMessage = $"{ex.Message}";
+
+        }
+        _procesando = false;
+    }
+
+
+}

@@ -1,0 +1,237 @@
+﻿@page "/gestionreservas"
+@rendermode InteractiveServer
+@inject GestionarReservasCasoDeUso GestionarReservasUseCase
+@inject IServicioSesion ServicioSesion
+@inject IUsuarioRepositorio UsuarioRepositorio
+@inject NavigationManager NavigationManager
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+
+<h3>Gestión de Reservas</h3>
+    <div class="mb-3">
+    <label for="filtroEstado" class="form-label"><strong>Filtrar por estado:</strong></label>
+    <select id="filtroEstado" class="form-select w-auto d-inline-block" @bind="estadoFiltro">
+        <option value="Todos">Todos</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="Confirmada">Confirmada</option>
+        <option value="Rechazada">Rechazada</option>
+    </select>
+</div>
+
+@if (reservas.Count == 0)
+{
+    <p>No hay reservas aún.</p>
+}
+else if (reservasFiltradas.Count == 0)
+{
+    <p>No hay reservas que coincidan con el filtro seleccionado.</p>
+}
+else
+{
+    @foreach (var reserva in reservasFiltradas)
+    {
+        <div class="card p-3 my-3">
+            @if (!infoUsuarios[reserva.IdUsuario].Eliminado)
+            {
+                <p><strong>Usuario:</strong> @infoUsuarios[reserva.IdUsuario].NombreCompleto</p>
+                <p><strong>Email:</strong> @infoUsuarios[reserva.IdUsuario].Email</p>
+            }
+            else
+            {
+                <p>@infoUsuarios[reserva.IdUsuario].NombreCompleto</p>
+            }
+            <p><strong>Alojamiento:</strong> @nombresAlojamientos[reserva.IdAlojamiento]</p>
+            <p><strong>Desde:</strong> @reserva.FechaInicioEstadia.ToShortDateString()</p>
+            <p><strong>Hasta:</strong> @reserva.FechaFinEstadia.ToShortDateString()</p>
+            <p><strong>Monto:</strong> $@reserva.MontoEstadia</p>
+            <p><strong>Estado:</strong> @reserva.EstadoReserva</p>
+
+           @if (reserva.EstadoReserva == EstadoReserva.Pendiente)
+            {
+            <div class="d-flex justify-content-start gap-2 mt-2">
+                <button class="btn btn-success btn-sm" style="width: auto; min-width: 90px;" @onclick="() => Aceptar(reserva.Id)">
+                    Aceptar
+                </button>
+                <button class="btn btn-danger btn-sm" style="width: auto; min-width: 90px;" @onclick="() => Rechazar(reserva.Id)">
+                    Rechazar
+                </button>
+            </div>
+            }
+            else if (reserva.EstadoReserva ==EstadoReserva.Confirmada)
+            {
+            <div class="mt-2">
+                <span class="badge rounded-pill bg-success text-white px-3 py-2" style="font-size: 0.9rem;">
+                    ✔ Confirmada
+                </span>
+            </div>
+            }
+            else if (reserva.EstadoReserva == EstadoReserva.Rechazada)
+            {
+            <div class="mt-2">
+                <span class="badge rounded-pill bg-danger text-white px-3 py-2" style="font-size: 0.9rem;">
+                    ✖ Rechazada
+                </span>
+            </div>
+            }
+            <div class="d-flex gap-2 mt-3">
+            @if (reserva.Inquilinos?.Count > 0 && !infoUsuarios[reserva.IdUsuario].Eliminado)
+            {
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => VerInquilinos(reserva.Id)">
+                    Ver Inquilinos
+                </button>
+            }
+        </div>
+
+           @if (mostrarInquilinos && reservaSeleccionada?.Id == reserva.Id)
+            {
+                <div class="card p-3 my-3 bg-light border-secondary">
+                    <h5>Información de Inquilinos</h5>
+                    @for (int i = 0; i < reservaSeleccionada.Inquilinos.Count; i++)
+                    {
+                        var inquilino = reservaSeleccionada.Inquilinos[i];
+                        <div class="border p-2 mb-2 rounded">
+                            <p><strong>Nombre:</strong> @inquilino.Nombre</p>
+
+                            @if (!string.IsNullOrWhiteSpace(inquilino.Dni))
+                            {
+                                <p><strong>DNI:</strong> @inquilino.Dni</p>
+                            }
+
+                            @if (reservaSeleccionada.ListaInformacionAdicional?.Count > 0)
+                            {
+                                <div class="d-flex flex-wrap gap-2">
+                                    <p><strong>Fotos del DNI:</strong></p>
+                                    @{
+                                        var frente = reservaSeleccionada.ListaInformacionAdicional.FirstOrDefault(x => x.Contains($"Inquilino {i + 1}:") && x.Contains("frente"));
+                                        var dorso = reservaSeleccionada.ListaInformacionAdicional.FirstOrDefault(x => x.Contains($"Inquilino {i + 1}:") && x.Contains("dorso"));
+                                    }
+                                    @if (frente is not null)
+                                    {
+                                        <img src="@ExtraerRuta(frente)" alt="Frente DNI" width="150" class="img-thumbnail" />
+                                    }
+                                    @if (dorso is not null)
+                                    {
+                                        <img src="@ExtraerRuta(dorso)" alt="Dorso DNI" width="150" class="img-thumbnail" />
+
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    List<Reserva> reservas = new();
+    //string mensajeEstado = "";
+    Reserva? reservaSeleccionada = null;
+    bool mostrarInquilinos = false;
+    Dictionary<int, (string NombreCompleto, string Email, bool Eliminado)> infoUsuarios = new();
+
+    Dictionary<int, string> nombresAlojamientos = new();
+    private List<Reserva> reservasFiltradas = new();
+    private string _estadoFiltro = "Todos";
+
+    private string estadoFiltro
+    {
+        get => _estadoFiltro;
+        set
+        {
+            if (_estadoFiltro != value)
+            {
+                _estadoFiltro = value;
+                FiltrarReservas(); // Se ejecuta automáticamente cuando cambia el filtro
+            }
+        }
+    }
+
+    private void FiltrarReservas()
+    {
+        if (estadoFiltro == "Todos")
+        {
+            reservasFiltradas = reservas;
+        }
+        else
+        {
+            reservasFiltradas = reservas
+                .Where(r => r.EstadoReserva.ToString() == estadoFiltro)
+                .ToList();
+        }
+    }
+
+    void VerInquilinos(int id)
+    {
+        reservaSeleccionada = reservas.FirstOrDefault(r => r.Id == id);
+        mostrarInquilinos = true;
+    }
+
+
+    protected override void OnInitialized()
+    {
+        ServicioSesion.IniciarSesion();
+        reservas = GestionarReservasUseCase.ObtenerTodas();
+        var idsUsuarios = reservas.Select(r => r.IdUsuario).Distinct().ToList();
+
+        foreach (var id in idsUsuarios)
+        {
+            var usuario = UsuarioRepositorio.ObtenerPorId(id);
+            if (usuario is not null)
+            {
+                string nombre = usuario.EstaHabilitado
+                    ? $"{usuario.Nombre} {usuario.Apellido}"
+                    : "Usuario No disponible";
+
+                infoUsuarios[id] = (nombre, usuario.CorreoElectronico, !usuario.EstaHabilitado);
+            }
+            else
+            {
+                infoUsuarios[id] = ("Usuario No disponible","Sin correo", true);
+            }
+        }
+        var idsAlojamientos = reservas.Select(r => r.IdAlojamiento).Distinct().ToList();
+        foreach (var id in idsAlojamientos)
+        {
+            var alojamiento = AlojamientoRepositorio.ObtenerPorId(id).Result; // como es async
+            if (alojamiento is not null)
+            {
+                nombresAlojamientos[id] = alojamiento.Nombre;
+            }
+            else
+            {
+                nombresAlojamientos[id] = "Alojamiento desconocido";
+            }
+        }
+        FiltrarReservas();
+    }
+    void Aceptar(int id)
+    {
+        GestionarReservasUseCase.AceptarReserva(id);
+        reservas = GestionarReservasUseCase.ObtenerTodas();
+        FiltrarReservas(); 
+        StateHasChanged();
+    }
+
+    void Rechazar(int id)
+    {
+        GestionarReservasUseCase.RechazarReserva(id);
+        reservas = GestionarReservasUseCase.ObtenerTodas();
+        FiltrarReservas(); 
+        StateHasChanged();
+    }
+
+    private string ExtraerRuta(string entrada)
+    {
+        // Ej: "Inquilino 1: /imagenes/reservas/abc123.jpg (frente)"
+        var inicioRuta = entrada.IndexOf("/imagenes/reservas/");
+        var finRuta = entrada.LastIndexOf(" ");
+        if (inicioRuta >= 0 && finRuta > inicioRuta)
+        {
+            return entrada.Substring(inicioRuta, finRuta - inicioRuta);
+        }
+
+        return "/imagenes/reservas/imagen-no-encontrada.jpg"; // opcional: imagen por defecto
+    }
+
+}

@@ -1,0 +1,83 @@
+﻿@page "/CuentaAdministrador"
+@layout AL.UI.Components.Layout.AdminLayout
+@inject IServicioSesion ServicioSesion
+@inject NavigationManager NavigationManager
+@inject IUsuarioRepositorio UsuarioRepositorio
+
+@rendermode InteractiveServer
+
+<h3>Cuenta Administrador</h3>
+
+<div class="row">
+    <div class="col-auto">
+        <div class="card mb-3 me-3" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">Publicar Alojamiento</h5>
+                <p class="card-text">Agrega un nuevo alojamiento a la plataforma.</p>
+                <a href="/PublicarAlojamiento" class="btn btn-primary">Ir a Publicar</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="card mb-3" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">Listar Publicaciones</h5>
+                <p class="card-text">Puede ver la lista de alojamientos y editarlos.</p>
+                <a href="/alojamientos" class="btn btn-primary">Ir</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="card mb-3" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">Gestionar Reservas</h5>
+                <p class="card-text">Administra las reservas recibidas, aceptarlas o rechazarlas.</p>
+                <a href="/gestionreservas" class="btn btn-primary">Ir</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="card mb-3" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">Chats</h5>
+                <p class="card-text">Puede ver el historial de mensajes </p>
+                <a href="/BandejaDeEntrada" class="btn btn-primary">Conversaciones</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="card mb-3" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">Filtrar Usuarios</h5>
+                <p class="card-text">Puede ver la lista de usuarios según un filtro.</p>
+                <a href="/usuarios" class="btn btn-primary">Ir</a>
+            </div>
+        </div>
+    </div>   
+</div>
+
+@code {
+    private bool _usuarioInicializado = false;
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_usuarioInicializado)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+
+            _usuarioInicializado = true;
+
+            if (ServicioSesion.Rol != RolUsuario.Administrador)
+            {
+                NavigationManager.NavigateTo("/", true);
+
+            }
+
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+    }
+
+
+
+}

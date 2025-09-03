@@ -1,0 +1,119 @@
+﻿@page "/Registrarse"
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject UsuarioAlta UsuarioAlta
+@inject IHashService HashService
+@inject IUsuarioRepositorio IUsuarioRepositorio
+@inject ITarjetaRepositorio ITarjetaRepositorio
+@inject IUsuarioValidador IUsuarioValidador
+
+
+<h3>Registrarse</h3>
+<form>
+    <p>Nombre: <input placeholder="Nombre" @bind="_usuario.Nombre" class="form-control" required type="text"></p>
+    <p>Apellido: <input placeholder="Apellido" @bind="_usuario.Apellido" class="form-control" required type="text"></p>
+    <p>Fecha de Nacimiento:<input placeholder= DateTime.Today @bind="_usuario.FechaDeNacimiento" class="form-control" required type="date"></p>
+    <p>Email: <input placeholder="Email" @bind="_usuario.CorreoElectronico" class="form-control" required type="email"></p>
+    <p>Contraseña: <input placeholder="Contraseña" @bind="_password" type="password" class="form-control"></p>
+    @if (!string.IsNullOrEmpty(_password) && _password.Length < 8)
+    {
+        <div class="text-danger mb-2">La contraseña debe tener al menos 8 caracteres.</div>
+    }
+</form>
+<h4>Tarjeta</h4>
+<form>
+    <p>Numero: <input placeholder="Numero" @bind="_tarjeta.Numero" class="form-control" required type="text" maxlength="16" pattern="\d{16}" inputmode="numeric"></p>
+    <p>Nombre del Titular: <input placeholder="Nombre Titular" @bind="_tarjeta.NombreTitular" class="form-control" required type="text"> </p>
+    <p>Fecha de Vencimiento: 
+        <select class="form-control d-inline w-auto" @bind="_mesVencimiento">
+            <option value="">MM</option>
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m.ToString("D2")">@m.ToString("D2")</option>
+            }
+        </select>
+        /
+        <select class="form-control d-inline w-auto" @bind="_anioVencimiento">
+            <option value="">YY</option>
+            @for (int y = 25; y <= 50; y++)
+            {
+                <option value="@y.ToString("D2")">@y.ToString("D2")</option>
+            }
+        </select>
+    </p>
+    <p>Codigo de Seguridad:
+        <input placeholder="Codigo de seguridad" @bind="_tarjeta.CodigoSeguridad" class="form-control"
+               required type="text" maxlength="3" pattern="\d{3}" inputmode="numeric">
+    </p>
+</form>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @((MarkupString)ErrorMessage)
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @SuccessMessage
+    </div>
+}
+
+<div class="container">
+    <button class="btn btn-primary" @onclick="RegistrarUsuario">Aceptar</button>
+    <button @onclick="VolverHome" class="btn btn-primary">Inicio</button>
+</div>
+
+@code {
+    //private int id_Usuario => UserService.Id;
+    Usuario _usuario = new Usuario();
+    Tarjeta _tarjeta = new Tarjeta();
+    string _password = string.Empty;
+    String ErrorMessage { get; set; }=null!;
+    String SuccessMessage {get;set;}=null!;
+    private string _mesVencimiento = "";
+    private string _anioVencimiento = "";
+
+    private void RegistrarUsuario()
+    {
+        try
+        {
+ 
+            if(_password != null && _password.Length >= 8)
+            {
+                // Generar hash y sal para la contraseña ingresada
+                (string hash, string sal) = HashService.CreateHash(_password);
+                _usuario.HashContraseña = hash;
+                _usuario.SalContraseña = sal;
+                // Al registrar, une los valores:
+                _tarjeta.FechaVencimiento = $"{_mesVencimiento}/{_anioVencimiento}";
+                // Ejecutar el caso de uso para agregar el usuario
+                UsuarioAlta.Ejecutar(_usuario,_tarjeta);
+        
+                // Limpiar variables después de registrar correctamente
+                _usuario = new Usuario();
+                _password = string.Empty; // Limpiar contraseña también si es necesario
+                _tarjeta = new Tarjeta();
+                // Mensaje de éxito
+                ErrorMessage = ""; 
+                SuccessMessage = "Usuario registrado con éxito. Inicie Sesion";
+            }
+
+        }
+        catch (Exception ex)
+        {   
+            SuccessMessage = "";
+            ErrorMessage = $"Error:{ex.Message}";
+            Console.WriteLine($"Exception: {ex}");
+
+        }
+    }
+
+    private void VolverHome()
+    {
+        NavigationManager.NavigateTo("/"); // Vuelve al Home
+    }
+
+}

@@ -1,0 +1,82 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IServicioSesion ServicioSesion
+@using Microsoft.AspNetCore.Components
+@inject IAlojamientoRepositorio AlojamientoRepositorio
+@inject NavigationManager NavigationManager
+
+<PageTitle>AlquilandoWeb</PageTitle>
+<div class="text-center">
+  <h1>
+    <img src="logo.jpg" alt="Logo de AlquilandoWeb" style="vertical-align: middle; margin-right: 10px;">
+  </h1>
+</div>
+<div class="container text-center mt-5">
+  <p class="lead">Bienvenido a AlquilandoWeb, la plataforma de alquiler de propiedades más confiable y fácil de usar.
+  </p>
+
+  <EditForm Model="busqueda" OnValidSubmit="BuscarAlojamientos">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row justify-content-center mb-3">
+      <div class="col-md-3">
+        <InputText @bind-Value="busqueda.Ciudad" class="form-control" placeholder="Ciudad" />
+      </div>
+      <div class="col-md-3">
+        <InputDate @bind-Value="busqueda.FechaDesde"
+          class="form-control"
+          max="@busqueda.FechaHasta.ToString("yyyy-MM-dd")" />
+      </div>
+      <div class="col-md-3">
+        <InputDate @bind-Value="busqueda.FechaHasta"
+          class="form-control"
+          min="@busqueda.FechaDesde.ToString("yyyy-MM-dd")" />
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Buscar</button>
+      </div>
+    </div>
+  </EditForm>
+</div>
+
+@code {
+  private bool IsLoggedIn = false;
+  private Usuario usuario=null!;
+  private BusquedaAlojamiento busqueda = new BusquedaAlojamiento
+  {
+    FechaDesde = DateTime.Today,
+    FechaHasta = DateTime.Today.AddDays(1)
+  };
+
+
+  public class BusquedaAlojamiento
+  {
+    public string Ciudad { get; set; } = string.Empty;
+    public DateTime FechaDesde { get; set; }
+    public DateTime FechaHasta { get; set; }
+  }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoggedIn)
+        {
+            await ServicioSesion.InicializarUsuarioAsync();
+            if(ServicioSesion.Usuario!=null){
+              usuario = ServicioSesion.Usuario;
+              ServicioSesion.IniciarSesion();
+            } 
+            IsLoggedIn = true;
+            
+            StateHasChanged(); // Refresca la UI si es necesario
+        }
+
+    }
+
+  private void BuscarAlojamientos()
+  {
+      var url = $"/resultados?ciudad={Uri.EscapeDataString(busqueda.Ciudad)}&desde={busqueda.FechaDesde:yyyy-MM-dd}&hasta={busqueda.FechaHasta:yyyy-MM-dd}";
+      NavigationManager.NavigateTo(url);
+
+  }
+}

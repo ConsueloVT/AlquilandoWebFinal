@@ -1,0 +1,78 @@
+﻿@page "/recuperar"
+@inject IServicioSesion ServicioSesion
+@rendermode InteractiveServer
+
+<h3>Recuperar contraseña</h3>
+
+@if (!enviado)
+{
+    <div class="mb-3">
+        <label>Email:</label>
+        <input @bind="_email" class="form-control" />
+        @if (!string.IsNullOrEmpty(_errorEmail))
+        {
+            <div class="text-danger">@_errorEmail</div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_mensajeErrorGeneral))
+    {
+        <div class="alert alert-danger">@_mensajeErrorGeneral</div>
+    }
+
+    <button class="btn btn-primary" @onclick="Enviar">Enviar</button>
+}
+else
+{
+    <div class="alert alert-success">
+        Revisa tu bandeja de entrada y sigue las instrucciones para crear una nueva contraseña.
+    </div>
+}
+
+@code {
+    private string _email = "";
+    private string? _errorEmail;
+    private string? _mensajeErrorGeneral;
+    private bool enviado = false;
+
+    private async Task Enviar()
+    {
+        _errorEmail = null;
+        _mensajeErrorGeneral = null;
+
+        // Validaciones personalizadas
+        if (string.IsNullOrWhiteSpace(_email))
+        {
+            _errorEmail = "Por favor ingrese un email con un formato válido.";
+            return;
+        }
+        else if (!EsEmailValido(_email))
+        {
+            _errorEmail = "Por favor ingrese un email con un formato válido.";
+            return;
+        }
+
+        var existe = await ServicioSesion.ExisteUsuarioConEmail(_email);
+        if (existe)
+        {
+            enviado = true;
+        }
+        else
+        {
+            _mensajeErrorGeneral = "El correo ingresado no está registrado.";
+        }
+    }
+
+    private bool EsEmailValido(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

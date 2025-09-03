@@ -1,0 +1,77 @@
+﻿@page "/checkout/{idReserva:int}"
+@inject IReservasRepositorio repoReserva
+@inject NavigationManager nav
+
+
+<h3>Realizar Check-Out</h3>
+@if (!datosCargados)
+{
+    <p>Cargando reserva...</p>
+}
+else
+{
+    <p><strong>Alojamiento:</strong> @reserva.IdAlojamiento</p>
+    <h5>Check-list:</h5>
+
+    <EditForm OnValidSubmit="ConfirmarCheckOut">
+        @foreach (var item in checklistItems)
+        {
+            <div class="form-check">
+                <InputCheckbox @bind-Value="estados[item]" class="form-check-input" />
+                <label class="form-check-label">@item</label>
+            </div>
+        }
+
+        <button type="submit" class="btn btn-primary mt-3">Confirmar Check-Out</button>
+    </EditForm>
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert alert-info mt-3">@mensaje</div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int idReserva { get; set; }
+
+    private Reserva reserva=null!;
+    private List<string> checklistItems = new() { "Sábanas limpias", "Baño en condiciones", "Cocina sin daños", "Puertas y ventanas cerradas" };
+    private Dictionary<string, bool> estados = new();
+    private bool datosCargados = false;
+    private string mensaje= string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var reserva = repoReserva.ObtenerPorId(idReserva);
+        if (reserva == null)
+        {
+            nav.NavigateTo("/");
+            return;
+        }
+
+        // inicializar estados del checklist en true
+        foreach (var item in checklistItems)
+        {
+            estados[item] = true;
+        }
+
+        datosCargados = true;
+    }
+
+    private void ConfirmarCheckOut()
+    {
+        bool todoEnBuenEstado = estados.All(e => e.Value);
+
+        reserva.EstadoCheckOut = todoEnBuenEstado ? "En buen estado" : "Con daños";
+        repoReserva.Modificar(reserva);
+
+        if (todoEnBuenEstado)
+            mensaje = "Check-out registrado. Alojamiento liberado.";
+        else
+            mensaje = "Check-out registrado. El alojamiento requiere revisión.";
+
+        nav.NavigateTo("/check-outs-pendientes");
+    }
+
+}
