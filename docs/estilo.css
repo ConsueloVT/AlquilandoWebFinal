@@ -96,6 +96,7 @@ a:hover {
   position: absolute;
   right: 24px;
   bottom: 24px;
+  text-align: center;
   width: 84px;      /* Más grande */
   max-width: 28%;
   margin: 0;
