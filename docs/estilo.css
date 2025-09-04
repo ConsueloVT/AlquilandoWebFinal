@@ -82,7 +82,7 @@ footer {
   justify-content: space-between; /* texto a la izquierda, logo a la derecha */
   align-items: center;
   padding: 16px;
-  background-color: #f5f5f5; /* o el color que uses */
+  background-color: #fff; /* o el color que uses */
 }
 
 .footer-grupo p {
