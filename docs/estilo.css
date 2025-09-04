@@ -7,11 +7,23 @@ body, h1, h2, h3, p, ul, li, a {
 
 /* Fuente y fondo */
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background-color: #f9f9f9;
-  color: #333;
-  line-height: 1.6;
-  padding: 20px;
+  background: #c4dca7;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.centrado-recuadro {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  padding: 40px 32px;
+  min-width: 320px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
 }
 
 /* Encabezado */
@@ -31,23 +43,21 @@ header h1 {
 /* Navegación */
 nav ul {
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
+  padding: 0;
+  margin: 24px 0;
 }
-
+nav ul li {
+  margin: 12px 0;
+}
 nav ul li a {
-  color: white;
   text-decoration: none;
+  color: #6ace46;
   font-weight: bold;
-  padding: 6px 12px;
-  background-color: #005fa3;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
+  font-size: 1.1em;
+  transition: color 0.2s;
 }
-
 nav ul li a:hover {
-  background-color: #003f73;
+  color: #59d53a;
 }
 
 /* Secciones */
@@ -62,10 +72,9 @@ h2 {
 
 /* Footer */
 footer {
-  margin-top: 40px;
-  text-align: center;
-  font-size: 0.9em;
-  color: #666;
+  margin-top: 32px;
+  color: #888;
+  font-size: 0.95em;
 }
 
 /* Enlaces internos */
@@ -75,12 +84,35 @@ a {
 }
 
 a:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* Responsive */
 @media (max-width: 600px) {
+  body {
+    padding: 10px;
+  }
+  .centrado-recuadro {
+    padding: 20px 8px;
+    min-width: unset;
+    max-width: 100%;
+    border-radius: 8px;
+  }
+  header {
+    padding: 12px;
+    font-size: 1em;
+  }
   nav ul {
-    flex-direction: column;
+    margin: 16px 0;
+  }
+  nav ul li {
+    margin: 8px 0;
+  }
+  header h1 {
+    font-size: 1.2em;
+  }
+  footer {
+    font-size: 0.9em;
+    margin-top: 20px;
   }
 }
