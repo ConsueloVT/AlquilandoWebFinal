@@ -25,6 +25,64 @@ body {
   width: 100%;
   text-align: center;
 }
+.contenedor-entregas {
+  max-width: 600px;
+  margin: 40px auto;
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  text-align: center;
+}
+h1 {
+  margin-bottom: 24px;
+  font-size: 1.8em;
+}
+
+.bloque-entrega {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.titulo-entrega {
+  background-color: #2f7d4f;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1.1em;
+}
+.bloque-entrega ul {
+  list-style: none;
+  padding-left: 20px;
+  margin-top: 10px;
+}
+
+.bloque-entrega li {
+  margin: 8px 0;
+}
+
+.bloque-entrega a {
+  color: #007acc;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.bloque-entrega a:hover {
+  text-decoration: underline;
+}
+.volver-inicio {
+  display: inline-block;
+  margin-top: 30px;
+  color: #007acc;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.volver-inicio:hover {
+  text-decoration: underline;
+}
 
 /* Encabezado */
 header {
