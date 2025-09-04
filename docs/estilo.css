@@ -93,13 +93,11 @@ a:hover {
 }
 
 .logo-grupo {
-  position: absolute;
-  right: 24px;
-  bottom: 24px;
-  text-align: center;
-  width: 84px;      /* Más grande */
-  max-width: 28%;
-  margin: 0;
+  display: block;
+  margin: 20px auto;
+  max-width: 100px;
+  position: static;
+
 }
 
 /* Responsive */
